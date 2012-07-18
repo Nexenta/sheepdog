@@ -391,7 +391,7 @@ static void requeue_request(struct request *req)
 	queue_request(req);
 }
 
-static void clear_client(struct client_info *ci);
+static void clear_client_info(struct client_info *ci);
 
 static struct request *alloc_local_request(void *data, int data_length)
 {
@@ -491,13 +491,10 @@ void put_request(struct request *req)
 		req->done = 1;
 		eventfd_write(req->wait_efd, value);
 	} else {
-		if (conn_tx_on(&ci->conn)) {
-			dprintf("connection seems to be dead\n");
-			free_request(req);
-			clear_client(ci);
-		} else {
+		if (conn_tx_on(&ci->conn))
+			clear_client_info(ci);
+		else
 			list_add(&req->request_list, &ci->done_reqs);
-		}
 	}
 }
 
@@ -662,9 +659,11 @@ static void destroy_client(struct client_info *ci)
 	free(ci);
 }
 
-static void clear_client(struct client_info *ci)
+static void clear_client_info(struct client_info *ci)
 {
 	struct request *req, *t;
+
+	dprintf("connection seems to be dead\n");
 
 	if (ci->rx_req) {
 		free_request(ci->rx_req);
@@ -745,8 +744,7 @@ static void client_handler(int fd, int events, void *data)
 
 	if (is_conn_dead(&ci->conn)) {
 err:
-		dprintf("connection seems to be dead\n");
-		clear_client(ci);
+		clear_client_info(ci);
 	}
 }
 
